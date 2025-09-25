@@ -1,0 +1,38 @@
+[sniffer]
+file_path = "../test/samples/srsRAN_tdd_n78_samprate_2304_20MHz_scs_30khz.fc32"
+sample_rate = 23040000
+# band 78 tdd
+frequency = 3483840000
+ssb_numerology = 1
+
+[[pdcch]]
+coreset_id = 0
+subcarrier_offset = -24
+num_prbs = 24
+numerology = 1
+dci_sizes_list = [37]
+scrambling_id_start = 1
+scrambling_id_end = 1
+rnti_start = 65500
+rnti_end = 65535
+coreset_interleaving_pattern = "interleaved"
+coreset_duration = 2
+coreset_nshift = 1
+AL_corr_thresholds = [1, 1, 0.5, 1, 1]
+num_candidates_per_AL = [0, 0, 1, 0, 0]
+
+[[pdcch]]
+coreset_id = 1
+subcarrier_offset = -168
+num_prbs = 48
+numerology = 1
+dci_sizes_list = [42, 38]
+scrambling_id_start = 1
+scrambling_id_end = 1
+rnti_start = 17920
+rnti_end = 17925
+interleaving_pattern = "non-interleaved"
+coreset_duration = 2
+AL_corr_thresholds = [1, 0.5, 0.5, 1, 1]
+num_candidates_per_AL = [0, 8, 4, 0, 0]
+

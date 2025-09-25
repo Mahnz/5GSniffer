@@ -12,36 +12,13 @@ This research was conducted as part of a research project, 5G ROSETA, funded by 
 - Configurable for speed/accuracy trade-off.
 
 
-### License
+## Dependencies
 
-## Installation
-
-### Pre-requisites
-#### Ubuntu
-The code was tested to successfully compile on Ubuntu 22.04. Please use the following instructions to install the required dependences. 
-
-```
+All required dependencies can be installed on ubuntu with the following:
+```bash
 sudo apt-get update
 sudo apt-get install cmake make gcc g++ pkg-config libfftw3-dev libmbedtls-dev libsctp-dev libyaml-cpp-dev libgtest-dev libliquid-dev libconfig++-dev libzmq3-dev libspdlog-dev libfmt-dev
 ```
-
-5GSniffer was tested with clang version 14 on Ubuntu:
-```
-sudo apt install clang
-```
-
-<!--
-SPDLOG?
-```
-sudo apt-get install libspdlog-dev
-```
-
-LIBFMT?
-```
-sudo add-apt-repository universe
-sudo apt update
-sudo apt install libfmt-dev
-``` -->
 
 #### Arch Linux
 Alternatively, on Arch Linux (tested on version 2024-11) the required dependencies can be installed as follows:
@@ -53,22 +30,30 @@ pacman -S gcc git cmake clang make libuhd spdlog mbedtls boost lksctp-tools libc
 ### Hardware
 Uses srsRAN basic SDR libraries, supports USRP B210, X310, bladeRF. For this release it is recommended to use a recorded file.
 
-```
+```bash
 sudo apt-get install libuhd-dev uhd-host
 ```
 
 ### Building
 #### Ubuntu
-```
+```bash
 git clone --recurse-submodules https://github.com/spritelab/5GSniffer.git
 cd 5GSniffer/5gsniffer
-mkdir -p build
-cd build
-export CXX=/usr/bin/clang++-14
+
+mkdir -p build && rm -rf build/* && cd build
+
+cmake ..
+make -j$(nproc)
+
+# Optional
+sudo make install
+sudo ldconfig
+```
+
+<!-- export CXX=/usr/bin/clang++-14
 export CC=/usr/bin/clang-14
 cmake -DCMAKE_C_COMPILER=/usr/bin/clang-14 -DCMAKE_CXX_COMPILER=/usr/bin/clang++-14 ..
-make -j 8
-```
+make -j 8 -->
 
 Add the `-DCMAKE_BUILD_TYPE=Debug` flag to build in developer / debug mode
 
@@ -96,16 +81,16 @@ When using `clang`, replace the CMake command with the following:
 cmake -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ ..
 ```
 
-#### Docker
+## Docker
 Docker can be used to build and run 5GSniffer on any distribution:
 
 Building:
-```
+```bash
 docker build -t 5gsniffer:latest .
 ```
 
 Running: 
-```
+```bash
 docker run --mount=type=bind,source=/path-to-downloaded-samples-folder/,target=/5gsniffer/5gsniffer/test/samples/ -it 5gsniffer:latest 
 ```
 
@@ -136,13 +121,18 @@ This recording was taken by connecting 2 smartphones to a srsRAN 5G gNB and gene
 
 To run, place the file under 5GSniffer/5gsniffer/test/samples and run the executable with the config file SpriteLab-Private5G.toml:
 
-```
+```bash
+cd build
 ./src/5g_sniffer ../SpriteLab-Private5G.toml &> output.txt
 ```
 
-### **Detailed instructions**
+This will give an output to the terminal of all decoded PDCCH and SSB messages.
 
-All configuration parameters should be specified in the config file used as input to the sniffer. The example config file “SpriteLab-Private5G.toml” included in the code can be used as a reference and template.
+
+## Configuration
+
+### General config:
+All configuration parameters should be specified in the config file used as input to the sniffer. The example config file "SpriteLab-Private5G.toml" included in the code can be used as a reference and template.
 
 Currently, the sniffer supports the following configuration parameters.
 
@@ -161,7 +151,7 @@ The sniffer can operate from recorded files offline, or using a SDR.
 **ssb_numerology:** specifies the numerology used for the SSB block, i.e. numerology 0 for a subcarrier spacing of 15 kHz and 1 for 30 kHz.
 
 
-#### **PDCCH-specific config parameters:**
+#### PDCCH-specific config
 
 5G is flexible and highly configurable; it can operate over multiple Control Resource Sets (CORESET), and multiple PDCCH configurations. As such, it is more complex than LTE and requires additional prior information. The tool allows multiple [pdcch] configs in the configuration file. Each PDCCH can have multiple configurable parameters. The parameters are the following:
 
@@ -261,22 +251,24 @@ Then, to compute subcarrier_offset, as the PDCCH BW is 48 PRBs, we need to put t
 
 The rest of the parameters are as follows:
 
-coreset_id = 1 <br>
-#sc offset aligns the BWP to the lowest SC of the BWP <br>
-subcarrier_offset = 34 <br>
-num_prbs = 48 <br>
-numerology = 0 <br>
-dci_sizes_list = [39] <br>
-scrambling_id_start = 1 <br>
-scrambling_id_end = 1 <br>
-interleaving_pattern = "non-interleaved" <br>
-coreset_duration = 2 <br>
-AL_corr_thresholds = [1, 1, 0.4, 1, 1] <br>
-num_candidates_per_AL = [0, 0, 4, 0, 0] <br>
+```toml
+coreset_id = 1 
+#sc offset aligns the BWP to the lowest SC of the BWP 
+subcarrier_offset = 34 
+num_prbs = 48 
+numerology = 0 
+dci_sizes_list = [39] 
+scrambling_id_start = 1 
+scrambling_id_end = 1 
+interleaving_pattern = "non-interleaved" 
+coreset_duration = 2 
+AL_corr_thresholds = [1, 1, 0.4, 1, 1] 
+num_candidates_per_AL = [0, 0, 4, 0, 0] 
+```
 
 Video using the sniffer:
 
-https://youtu.be/x9vkgp9ol44
+[https://youtu.be/x9vkgp9ol44](https://youtu.be/x9vkgp9ol44) 
 
 
 

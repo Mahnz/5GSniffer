@@ -1,0 +1,5 @@
+**/.vscode
+**/build
+**/*.out
+**/*.fc32
+5gsniffer/lib/srsRANRF
