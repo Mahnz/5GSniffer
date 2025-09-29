@@ -1,4 +1,23 @@
-#ifndef SRSRAN_EXPORTS_H
+
+#ifndef PSS_H
+#define PSS_H
+
+#include <array>
+#include <liquid/liquid.h>
+#include <complex>
+#include <utility>
+#include "common_checks.h"
+
+class pss
+{
+public:
+/*PSS/SSB Constants*/
+	static constexpr uint8_t pss_length = 127;
+
+/*Constructor/Destructor*/
+	pss();
+	pss(uint8_t nid_2_);
+   #ifndef SRSRAN_EXPORTS_H
 #define SRSRAN_EXPORTS_H
 
 #include <srsran/srsran.h>
