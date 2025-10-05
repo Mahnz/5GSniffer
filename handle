@@ -1,0 +1,40 @@
+#!/bin/bash
+
+PROCS=$(nproc)
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+  --build)
+    BUILD=true
+    shift
+    ;;
+  --run)
+    RUN=true
+    shift
+    ;;
+  --procs)
+    PROCS="$2"
+    shift 2
+    ;;
+  *)
+    echo "Unknown option $1"
+    exit 1
+    ;;
+  esac
+done
+
+if [ "$BUILD" == "true" ]; then
+  docker build --build-arg PROC=$PROCS -t 5gsniffer:latest .
+elif [ "$RUN" == "true" ]; then
+  docker run --rm --name="5gsniffer-cnt" \
+    -v "/home/mahnz/Desktop/5G_Thesis/samples:/5gsniffer/test/samples:z" \
+    -v "/home/mahnz/Desktop/5G_Thesis/5GSniffer/5gsniffer/configs:/5gsniffer/configs:z" \
+    -it 5gsniffer:latest
+else
+  echo "Usage: $0 [--build|--run] [--procs NUMBER]"
+  echo "  --build: Build the Docker image"
+  echo "  --run:   Run the Docker container"
+  echo "  --procs: Specify number of processors (default: MAX)"
+  exit 1
+fi

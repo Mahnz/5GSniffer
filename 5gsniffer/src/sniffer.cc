@@ -10,6 +10,10 @@
 
 using namespace std;
 
+// MHZ - Import
+#include "config.h"
+#include "rnti_tracker.hpp"
+
 /** 
  * Constructor for sniffer when using SDR.
  *
@@ -57,10 +61,26 @@ void sniffer::init() {
 void sniffer::start() {
   running = true;
   float seconds_per_chunk = 0.0080;
-    
-  uint32_t num_samples_per_chunk = static_cast<uint32_t>(sample_rate * seconds_per_chunk);
 
+  uint32_t num_samples_per_chunk = static_cast<uint32_t>(sample_rate * seconds_per_chunk);
+  
+// MHZ - Configure RNTI tracker (if enabled by TOML)
+  if (config.rnti_tracker.enabled) {
+    RntiTracker::instance().configure(
+        config.rnti_tracker.output_path,
+        config.rnti_tracker.format,
+        config.rnti_tracker.ttl_seconds);
+    SPDLOG_INFO("RNTI tracker enabled: path='{}', fmt='{}', ttl={}s, crnti_only={}",
+                config.rnti_tracker.output_path,
+                config.rnti_tracker.format,
+                config.rnti_tracker.ttl_seconds,
+                config.rnti_tracker.crnti_only);
+  } else {
+    SPDLOG_INFO("RNTI tracker disabled via config.");
+  }
+  
   while(running) {
+    // MHZ - This message is called both with file_source and SDR. Correct?
     SPDLOG_DEBUG("Calling device work for SDR");
 
     auto sniffer_work_t0 = time_profile_start();
@@ -71,7 +91,6 @@ void sniffer::start() {
   SPDLOG_DEBUG("Terminating sniffer");
 }
 
-// MHZ - Is it never stopped? No usage of this
 void sniffer::stop() {
   SPDLOG_DEBUG("Received signal to stop sniffer");
   running = false;

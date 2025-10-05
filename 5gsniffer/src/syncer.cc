@@ -345,7 +345,7 @@ void syncer::on_mib_found(srsran_mib_nr_t& mib, bool found) {
   if (found == false){
     on_sync_lost();
   }else{
-  SPDLOG_INFO("Got MIB\nSSB \n Cell ID: {} \n MIB: SFN: {}, SCS: {} ", phy->get_cell_id(), mib.sfn, (int)mib.scs_common);
+  SPDLOG_INFO("Got MIB\nSSB \nCell ID: {} \nMIB: SFN: {}, SCS: {} ", phy->get_cell_id(), mib.sfn, (int)mib.scs_common);
   mib_id++;
   char mib_str[512] = {};
   srsran_pbch_msg_nr_mib_info(&mib, mib_str, sizeof(mib_str));

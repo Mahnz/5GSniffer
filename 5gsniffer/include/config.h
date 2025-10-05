@@ -38,6 +38,17 @@ typedef struct pdcch_config {
   int rnti_list_length;
 } pdcch_config;
 
+// MHZ - RNTI tracker configuration  
+typedef struct rnti_tracker_config {
+  bool enabled;
+  std::string output_path;
+  std::string format;
+  double ttl_seconds;
+  bool crnti_only;
+  int emit_period_ms;
+  double beta;
+} rnti_tracker_config;
+
 struct config {
   string file_path;
   uint64_t sample_rate;
@@ -47,6 +58,9 @@ struct config {
   uint16_t ssb_numerology;
 
   vector<pdcch_config> pdcch_configs;
+
+  // MHZ - Single tracker config
+  rnti_tracker_config rnti_tracker;
 
   static struct config load(string config_path) {
     struct config conf;
@@ -61,6 +75,34 @@ struct config {
     conf.nid_2 = toml["sniffer"]["nid_2"].value_or(4);
     conf.rf_args = toml["sniffer"]["rf_args"].value_or(""sv).data();
     conf.ssb_numerology = toml["sniffer"]["ssb_numerology"].value_or(0);
+
+    // MHZ - RNTI tracker config
+    if (toml.contains("rnti_tracker") && toml["rnti_tracker"].is_table()) {
+      toml::table tracker_table = *toml["rnti_tracker"].as_table();
+      rnti_tracker_config tracker_cfg;
+      
+      if (tracker_table["enabled"] == true) {
+        SPDLOG_INFO("RNTI Tracker enabled");
+        tracker_cfg.enabled = true;
+      } else {
+        SPDLOG_INFO("RNTI Tracker disabled");
+        tracker_cfg.enabled = false;
+        conf.rnti_tracker = tracker_cfg;
+        return conf;
+      }
+      tracker_cfg.output_path = tracker_table["output_path"].value_or("./rnti_log.csv"sv).data();
+      SPDLOG_INFO("RNTI Tracker output path: {}", tracker_cfg.output_path);
+      tracker_cfg.format = tracker_table["format"].value_or("csv"sv).data();
+      tracker_cfg.ttl_seconds = tracker_table["ttl_seconds"].value_or(20.0);
+      tracker_cfg.crnti_only = tracker_table["crnti_only"].value_or(true);
+      tracker_cfg.emit_period_ms = tracker_table["emit_period_ms"].value_or(0);
+      tracker_cfg.beta = tracker_table["beta"].value_or(1.0);
+
+      conf.rnti_tracker = tracker_cfg;
+    } else {
+      SPDLOG_INFO("Tracker table not found in TOML config");
+    }
+
     if(!toml["pdcch"].is_array_of_tables())
       throw config_exception("PDCCH TOML config should be an array of tables, e.g. [[pdcch]]");
     
@@ -139,5 +181,7 @@ struct config {
     return conf;
   }
 };
+
+extern struct config config;
 
 #endif // CONFIG_H
