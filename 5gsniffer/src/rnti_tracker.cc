@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <cctype>
+#include <algorithm>
 
 
 // —————————————————————————— Helpers ——————————————————————————
@@ -47,31 +49,8 @@ static inline std::string json_escape(const std::string &s) {
   return out;
 }
 
-// ———————————————————— JSON events per line ————————————————————
-JsonlRntiSink::JsonlRntiSink(const std::string &path) : path_(path) {}
+// ——————————————————————————————————————————————————————————————
 
-void JsonlRntiSink::on_event(const std::string &event_type, const RntiRecord &r) {
-  std::ofstream f(path_, std::ios::app);
-  f << "{"
-    << "\"event\":\"" << json_escape(event_type) << "\","
-    << "\"rnti\":" << r.rnti << ","
-    << "\"first_seen\":" << std::fixed << std::setprecision(6) << r.first_seen << ","
-    << "\"last_seen\":" << std::fixed << std::setprecision(6) << r.last_seen << ","
-    << "\"first_sample\":" << r.first_sample << ","
-    << "\"last_sample\":" << r.last_sample << ","
-    << "\"seen_count\":" << r.seen_count << ","
-    << "\"cell_id\":" << r.cell_id << ","
-    << "\"scrambling_id\":" << r.scrambling_id << ","
-    << "\"coreset_id\":" << (int)r.coreset_id << ","
-    << "\"aggregation_level\":" << (int)r.aggregation_level << ","
-    << "\"candidate_idx\":" << (int)r.candidate_idx << ","
-    << "\"slot\":" << (int)r.slot << ","
-    << "\"ofdm_symbol\":" << (int)r.ofdm_symbol << ","
-    << "\"num_symbols_per_slot\":" << (int)r.num_symbols_per_slot << ","
-    << "}\n";
-}
-
-// ——————————————————————— JSON per RNTI ———————————————————————
 JsonPerRntiSink::JsonPerRntiSink(const std::string &path) : path_(path) {}
 
 void JsonPerRntiSink::on_event(const std::string &/*event_type*/, const RntiRecord &r) {
@@ -97,10 +76,8 @@ void JsonPerRntiSink::write_all() {
   const std::string tmp = path_ + ".tmp";
   std::ofstream f(tmp, std::ios::trunc);
 
-  if (format_ == "json_per_rnti") {
-    f << "{\"generated_at_s\":" << std::fixed << std::setprecision(6) << now_s
-      << ",\"ttl_seconds\":" << ttl_seconds_ << ",\"rntis\":[";
-  }
+  f << "{\"generated_at_s\":" << std::fixed << std::setprecision(6) << now_s
+    << ",\"ttl_seconds\":" << ttl_seconds_ << ",\"rntis\":[";
 
   bool first_rec = true;
   for (const auto &kv : records_) {
@@ -110,60 +87,45 @@ void JsonPerRntiSink::write_all() {
     }
     first_rec = false;
     
-    if (format_ == "json_per_rnti") {
-      f << "{";
-    }
-    f << "\"rnti\":" << r.rnti << ",";
+    f << "{"
+      << "\"rnti\":" << r.rnti << ",";
     
-    if (format_ == "json_per_rnti") {
-      const bool active = (ttl_seconds_ > 0.0) ? ((now_s - r.last_seen) <= ttl_seconds_) : true;
-      f << "\"active\":" << (active ? "true":"false") << ",";
-    }
+    const bool active = (ttl_seconds_ > 0.0) ? ((now_s - r.last_seen) <= ttl_seconds_) : true;
+    f << "\"active\":" << (active ? "true":"false") << ",";
     
-    f << "\"first_seen\":" << std::fixed << std::setprecision(6) << r.first_seen << ","
+    f << "\"revivals\":" << r.revivals << ","
+      << "\"first_seen\":" << std::fixed << std::setprecision(6) << r.first_seen << ","
       << "\"last_seen\":" << std::fixed << std::setprecision(6) << r.last_seen << ","
       << "\"first_sample\":" << r.first_sample << ","
       << "\"last_sample\":" << r.last_sample << ","
       << "\"seen_count\":" << r.seen_count << ","
-      << "\"cell_id\":" << r.cell_id << ","
-      << "\"scrambling_id\":" << r.scrambling_id << ","
-      << "\"coreset_id\":" << (int)r.coreset_id << ","
-      << "\"aggregation_level\":" << (int)r.aggregation_level << ","
-      << "\"candidate_idx\":" << (int)r.candidate_idx << ","
-      << "\"slot\":" << (int)r.slot << ","
-      << "\"ofdm_symbol\":" << (int)r.ofdm_symbol << ","
-      << "\"num_symbols_per_slot\":" << (int)r.num_symbols_per_slot << ","
       << "\"events\":[";
     
+    // Block of events
     bool first_ev = true;
     for (const auto &ev : r.events) {
       if (!first_ev) f << ",";
       first_ev = false;
-      f << "{";
-      if (now_s == -1.0) {
-        f << "\"type\":\"" << json_escape(ev.type) << "\",";
-      }
-      f << "\"t\":" << std::fixed << std::setprecision(6) << ev.t_seconds << ","
-        << "\"sample\":" << ev.sample_index << ","
+      f << "{"
+        << "\"t\":" << std::fixed << std::setprecision(6) << ev.t_seconds << ","
+        << "\"cell_id\":" << ev.cell_id << ","
+        << "\"scrambling_id\":" << ev.scrambling_id << ","
+        << "\"aggregation_level\":" << (int)ev.aggregation_level << ","
         << "\"correlation\":" << ev.correlation << ","
+        << "\"sample\":" << ev.sample_index << ","
         << "\"slot\":" << (int)ev.slot << ","
         << "\"ofdm_symbol\":" << (int)ev.ofdm_symbol << ","
-        << "\"aggregation_level\":" << (int)ev.aggregation_level << ","
         << "\"candidate_idx\":" << (int)ev.candidate_idx
         << "}";
     }
     f << "]}";
   }
-  f << "]";
-  if (format_ == "json_per_rnti") {
-    f << "}";
-  }
+  f << "]}";
   f.close();
 
   std::error_code ec;
   std::filesystem::rename(tmp, path_, ec);
   if (ec) {
-    // Fallback su copy+overwrite se rename atomico fallisce su FS non supportato
     std::filesystem::copy_file(tmp, path_, std::filesystem::copy_options::overwrite_existing, ec);
     std::filesystem::remove(tmp, ec);
   }
@@ -172,10 +134,7 @@ void JsonPerRntiSink::write_all() {
 
 // ——————————————————— Tracker Initialization ———————————————————
 std::unique_ptr<IRntiSink> RntiTracker::make_sink(const std::string &format, const std::string &path) {
-  if (format == "json_per_rnti") {
-    return std::make_unique<JsonPerRntiSink>(path);
-  }
-  return std::make_unique<JsonlRntiSink>(path);
+  return std::make_unique<JsonPerRntiSink>(path);
 }
 
 RntiTracker &RntiTracker::instance() {
@@ -197,6 +156,7 @@ void RntiTracker::configure(const std::string &output_path,
 
 void RntiTracker::observe(const RntiEvent &ev) {
   std::lock_guard<std::mutex> lk(mu_);
+
   auto it = table_.find(ev.rnti);
   const bool is_new = (it == table_.end());
   if (is_new) {
@@ -207,55 +167,30 @@ void RntiTracker::observe(const RntiEvent &ev) {
     r.first_sample = ev.sample_index;
     r.last_sample = ev.sample_index;
     r.seen_count = 1;
-    r.cell_id = ev.cell_id;
-    r.scrambling_id = ev.scrambling_id;
-    r.coreset_id = ev.coreset_id;
-    r.aggregation_level = ev.aggregation_level;
-    r.candidate_idx = ev.candidate_idx;
-    r.slot = ev.slot;
-    r.ofdm_symbol = ev.ofdm_symbol;
-    r.num_symbols_per_slot = ev.num_symbols_per_slot;
-    
-    // First event
-    RntiEventEntry e{};
-    e.type = "new";
-    e.t_seconds = ev.t_seconds;
-    e.sample_index = ev.sample_index;
-    e.correlation = ev.correlation;
-    e.slot = ev.slot;
-    e.ofdm_symbol = ev.ofdm_symbol;
-    e.aggregation_level = ev.aggregation_level;
-    e.candidate_idx = ev.candidate_idx;
-    r.events.push_back(e);
+    r.revivals = 0;
 
+    // First event
+    r.events.push_back(ev);
     it = table_.emplace(ev.rnti, std::move(r)).first;
+
+    // O(1): nuovo RNTI inserito -> incrementa contatore attivi
+    active_count_++;
+
   } else {
     RntiRecord &r = it->second;
+
+    const double gap = ev.t_seconds - r.last_seen;
+    if (gap > ttl_seconds_) {
+      r.revivals++;
+      // r.last_inactive_gap_s = gap;
+    }
+    
     r.last_seen = ev.t_seconds;
     r.last_sample = ev.sample_index;
-    r.seen_count += 1;
-
-    // Keep latest context
-    r.cell_id = ev.cell_id;
-    r.scrambling_id = ev.scrambling_id;
-    r.coreset_id = ev.coreset_id;
-    r.aggregation_level = ev.aggregation_level;
-    r.candidate_idx = ev.candidate_idx;
-    r.slot = ev.slot;
-    r.ofdm_symbol = ev.ofdm_symbol;
-    r.num_symbols_per_slot = ev.num_symbols_per_slot;
+    r.seen_count++;
 
     // Next event
-    RntiEventEntry e{};
-    e.type = "update";
-    e.t_seconds = ev.t_seconds;
-    e.sample_index = ev.sample_index;
-    e.correlation = ev.correlation;
-    e.slot = ev.slot;
-    e.ofdm_symbol = ev.ofdm_symbol;
-    e.aggregation_level = ev.aggregation_level;
-    e.candidate_idx = ev.candidate_idx;
-    r.events.push_back(e);
+    r.events.push_back(ev);
   }
 
   if (sink_) {
@@ -267,6 +202,10 @@ void RntiTracker::expire_older_than(double cutoff_s) {
   std::lock_guard<std::mutex> lk(mu_);
   for (auto it = table_.begin(); it != table_.end();) {
     if (it->second.last_seen < cutoff_s) {
+      // O(1): RNTI scaduto -> decrementa contatore attivi
+      if (active_count_ > 0) {
+        --active_count_;
+      }
       it = table_.erase(it);
     } else {
       ++it;
@@ -274,14 +213,19 @@ void RntiTracker::expire_older_than(double cutoff_s) {
   }
 }
 
-size_t RntiTracker::active_count(double now_s) const {
-  std::lock_guard<std::mutex> lk(mu_);
-  size_t n = 0;
-  for (const auto &kv : table_) {
-    if (now_s - kv.second.last_seen <= ttl_seconds_)
-      n++;
-  }
-  return n;
+// TODO - Evaluate which alternative is better
+// size_t RntiTracker::active_count(double now_s) const {
+//   std::lock_guard<std::mutex> lk(mu_);
+//   size_t n = 0;
+//   for (const auto &kv : table_) {
+//     if (now_s - kv.second.last_seen <= ttl_seconds_)
+//       n++;
+//   }
+//   return n;
+// }
+size_t RntiTracker::active_count(double /*now_s*/) const {
+  std::lock_guard<std::mutex> lk(mu_);  // thread-safe, to keep data consistency
+  return active_count_;
 }
 
 std::optional<RntiRecord> RntiTracker::get(uint16_t rnti) const {

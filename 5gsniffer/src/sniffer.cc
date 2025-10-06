@@ -64,19 +64,18 @@ void sniffer::start() {
 
   uint32_t num_samples_per_chunk = static_cast<uint32_t>(sample_rate * seconds_per_chunk);
   
-// MHZ - Configure RNTI tracker (if enabled by TOML)
+  // MHZ - Configure RNTI Tracker (if enabled by TOML)
   if (config.rnti_tracker.enabled) {
     RntiTracker::instance().configure(
         config.rnti_tracker.output_path,
         config.rnti_tracker.format,
         config.rnti_tracker.ttl_seconds);
-    SPDLOG_INFO("RNTI tracker enabled: path='{}', fmt='{}', ttl={}s, crnti_only={}",
+    SPDLOG_INFO("RNTI Tracker enabled: path='{}', fmt='{}', ttl={}s",
                 config.rnti_tracker.output_path,
                 config.rnti_tracker.format,
-                config.rnti_tracker.ttl_seconds,
-                config.rnti_tracker.crnti_only);
+                config.rnti_tracker.ttl_seconds);
   } else {
-    SPDLOG_INFO("RNTI tracker disabled via config.");
+    SPDLOG_INFO("RNTI Tracker disabled via config.");
   }
   
   while(running) {

@@ -9,13 +9,13 @@ rf_args = "type=b200,master_clock_rate=23.04e6"
 
 [rnti_tracker]
 enabled = true
-output_path = "./rnti_log.json"
-# format = "json"
-format = "json_per_rnti"
-# beta = 1.25                        # people-per-device correction factor (check with papers found)
-ttl_seconds = 10.0                 # RNTI inactivity expiry (between 10 and 30 seconds)
-crnti_only = false                 # log only C-RNTIs for people-counting
-emit_period_ms = 1000                 # emit output every N ms (0 to disable)
+output_path = "./logs/rnti_log.json"
+format = "json"
+# beta = 1.25                                         # people-per-device correction factor (check with papers found)
+ttl_seconds = 10.0                                  # RNTI inactivity expiry (between 10 and 30 seconds)
+priority_start = "15000"
+priority_end = "25000"
+emit_period_ms = 1000                               # emit output every N ms (0 to disable)
 
 
 # [[pdcch]]

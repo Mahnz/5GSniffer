@@ -1,7 +1,7 @@
 **/.vscode
 **/build
 **/build_docker
-**/*.out
+**/logs
 **/*.p
 **/*.fc32
 5gsniffer/lib/srsRANRF

@@ -44,9 +44,10 @@ typedef struct rnti_tracker_config {
   std::string output_path;
   std::string format;
   double ttl_seconds;
-  bool crnti_only;
-  int emit_period_ms;
   double beta;
+  int emit_period_ms;
+  uint16_t priority_start;
+  uint16_t priority_end;
 } rnti_tracker_config;
 
 struct config {
@@ -90,13 +91,19 @@ struct config {
         conf.rnti_tracker = tracker_cfg;
         return conf;
       }
-      tracker_cfg.output_path = tracker_table["output_path"].value_or("./rnti_log.csv"sv).data();
+      tracker_cfg.output_path = tracker_table["output_path"].value_or("./logs/rnti_log.json"sv).data();
       SPDLOG_INFO("RNTI Tracker output path: {}", tracker_cfg.output_path);
-      tracker_cfg.format = tracker_table["format"].value_or("csv"sv).data();
+      tracker_cfg.format = tracker_table["format"].value_or("json"sv).data();
       tracker_cfg.ttl_seconds = tracker_table["ttl_seconds"].value_or(20.0);
-      tracker_cfg.crnti_only = tracker_table["crnti_only"].value_or(true);
-      tracker_cfg.emit_period_ms = tracker_table["emit_period_ms"].value_or(0);
       tracker_cfg.beta = tracker_table["beta"].value_or(1.0);
+      tracker_cfg.emit_period_ms = tracker_table["emit_period_ms"].value_or(0);
+
+      tracker_cfg.priority_start = tracker_table["priority_start"].value_or(0);
+      tracker_cfg.priority_end = tracker_table["priority_end"].value_or(0);
+      if (tracker_cfg.priority_start != 0 && tracker_cfg.priority_end != 0 &&
+          tracker_cfg.priority_end < tracker_cfg.priority_start) {
+            std::swap(tracker_cfg.priority_start, tracker_cfg.priority_end);
+      }
 
       conf.rnti_tracker = tracker_cfg;
     } else {

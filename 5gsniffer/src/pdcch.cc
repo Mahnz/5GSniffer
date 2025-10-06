@@ -58,7 +58,7 @@ namespace nr {
     return coreset_info;
   }
 
-
+  // Precompute and store all possible DMRS sequences for the configured CORESET, RNTI range, and ALs
   void pdcch::initialize_dmrs_seq() { 
 
     auto init_dmrs_t0 = time_profile_start();
@@ -102,24 +102,54 @@ namespace nr {
 
     time_profile_end(init_dmrs_t0, "pdcch::initialize_dmrs_seq");
   }
-
-  // We initialize the list of RNTI with no specific order, just ascending RNTIs
+  
+  // MHZ - Initialize the list of RNTI with configurable prioritization
   void pdcch::initialize_RNTI_list() {
-    for (int i = rnti_start; i<=rnti_end; i++ ) {
-      found_RNTI_list.push_back(i);
+    found_RNTI_list.clear();
+
+    uint16_t ps = 0;
+    uint16_t pe = 0;
+    bool have_priority = false;
+
+    if (config.rnti_tracker.enabled &&
+        (config.rnti_tracker.priority_start != 0 || config.rnti_tracker.priority_end != 0)) {
+      ps = config.rnti_tracker.priority_start;
+      pe = config.rnti_tracker.priority_end;
+
+      // MHZ - Check bounds wrt configured RNTI range
+      if (ps < rnti_start) ps = rnti_start;
+      if (pe > rnti_end) pe = rnti_end;
+      have_priority = (ps != 0 || pe != 0) && (ps <= pe);
     }
-    SPDLOG_DEBUG("Initialized RNTI list between {} and {}", rnti_start, rnti_end);
+
+    // MHZ - First, add the priority range
+    if (have_priority) {
+      for (uint32_t r = ps; r <= pe; ++r) {
+        found_RNTI_list.push_back(static_cast<uint16_t>(r));
+      }
+    }
+
+    // MHZ - Then, add the rest of the standard range (avoiding duplicates)
+    for (uint32_t r = rnti_start; r <= rnti_end; ++r) {
+      if (have_priority && r >= ps && r <= pe) continue;
+      found_RNTI_list.push_back(static_cast<uint16_t>(r));
+    }
+
+    SPDLOG_DEBUG("Initialized RNTI list {}..{}{}, total {}",
+           rnti_start, rnti_end,
+           have_priority ? fmt::format(" with priority {}..{}", ps, pe) : "",
+           found_RNTI_list.size());
   }
 
-  // Once we find an RNTI, we reorder the list of RNTIs to put that RNTI first in the vector.
+  // Once an RNTI is found, reorder the list of RNTIs to put that RNTI first in the vector
   bool pdcch::update_RNTI_list(uint16_t found_RNTI) {
     bool rnti_in_list = false;
 
-    rnti_list_mutex.acquire();
+    rnti_list_mutex.acquire(); // thread-safe
     std::vector<uint16_t>::iterator position = std::find(found_RNTI_list.begin(), found_RNTI_list.end(), found_RNTI);
-    if (position != found_RNTI_list.end()) { // element not found, this might happen for SI-RNTI, 65535.
+    if (position != found_RNTI_list.end()) { // element not found (this might happen for SI-RNTI, 65535)
       found_RNTI_list.erase(position);
-      found_RNTI_list.insert(found_RNTI_list.begin(), found_RNTI);
+      found_RNTI_list.insert(found_RNTI_list.begin(), found_RNTI); // move the RNTI found to index 0
       rnti_in_list = true;
     }
     rnti_list_mutex.release();
@@ -158,9 +188,13 @@ namespace nr {
         if (last_emit_s < 0.0 || (now_s - last_emit_s) * 1000.0 >= static_cast<double>(period_ms)) {
           auto& tr = RntiTracker::instance();
 
+          if (tr.ttl_seconds() > 0.0) {
+            tr.expire_older_than(now_s - tr.ttl_seconds());
+          }
+
           const size_t active = tr.active_count(now_s);
 
-          SPDLOG_DEBUG("[RNTI_METRIC] t_s={:.6f} active_rntis={} ttl_s={:.1f}",
+          SPDLOG_INFO("[RNTI_METRIC] t_s={:.6f} active_rntis={} ttl_s={:.1f}",
                       now_s, active, tr.ttl_seconds());
           
           tr.flush();
@@ -282,8 +316,7 @@ namespace nr {
   }
 
 
-  int pdcch::delete_lower_AL_dcis(uint16_t scrambling_id, uint8_t n_slot, uint8_t n_ofdm , uint8_t candidate_idx, uint8_t AL, std::vector<dci>& found_dci_list)
-  {
+  int pdcch::delete_lower_AL_dcis(uint16_t scrambling_id, uint8_t n_slot, uint8_t n_ofdm , uint8_t candidate_idx, uint8_t AL, std::vector<dci>& found_dci_list) {
     int counter = 0;
     bool user_search_space = false;
     if (coreset_info.get_candidates_search_space().at(1>>AL) > 0) {
@@ -302,8 +335,7 @@ namespace nr {
     return counter;
   }
 
-  std::vector<dci> pdcch::get_found_dci_list_per_AL(uint8_t AL, std::vector<dci>& found_dci_list)
-  {
+  std::vector<dci> pdcch::get_found_dci_list_per_AL(uint8_t AL, std::vector<dci>& found_dci_list) {
     std::vector<dci> AL_dci_list;
     AL_dci_list.reserve(found_dci_list.size());
 
@@ -316,8 +348,7 @@ namespace nr {
   }
 
 
-  int pdcch::decode_pdcch(symbol& symbol, std::vector<std::complex<float>>& pdcch_symbols, dci dci_, srsran_pdcch_nr_res_t* res, bool rep_opt, int64_t metadata, int symbol_in_chunk)
-  {
+  int pdcch::decode_pdcch(symbol& symbol, std::vector<std::complex<float>>& pdcch_symbols, dci dci_, srsran_pdcch_nr_res_t* res, bool rep_opt, int64_t metadata, int symbol_in_chunk) {
     bool user_search_space = false;
 
     srsran_pdcch_nr_args_t args = {};
@@ -331,9 +362,9 @@ namespace nr {
     }
 
     // DCI decoding as in srsRAN library
-    q.K = dci_.get_nof_bits() + 24U;                                  // Payload size including CRC
+    q.K = dci_.get_nof_bits() + 24U;                                      // Payload size including CRC
     q.M = (dci_.get_found_aggregation_level()) * (PRB_RE - 3U) * CCE_REG; // Number of RE
-    q.E = q.M * 2;                                                 // Number of Rate-Matched bits
+    q.E = q.M * 2;                                                        // Number of Rate-Matched bits
 
     // Get polar code
     if (srsran_polar_code_get(&q.code, q.K, q.E, 9U) < SRSRAN_SUCCESS) {
@@ -427,7 +458,7 @@ namespace nr {
     // De-Scramble CRC with RNTI
     srsran_vec_xor_bbb(unpacked_rnti, &c[q.K - 16], &c[q.K - 16], 16);
 
-    // // Check CRC
+    // Check CRC
     ptr                = &c[q.K - 24];
     uint32_t checksum1 = srsran_crc_checksum(&q.crc24c, q.c, q.K);
 
