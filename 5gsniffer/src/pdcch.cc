@@ -23,6 +23,8 @@ namespace nr {
     scrambling_id_end = 0xffff;
     rnti_start = 0;
     rnti_end = 0xffff;
+    priority_start = 0;
+    priority_end = 0xffff;
     dci_sizes_list = {};
     sc_power_decision = false;
     max_rnti_queue_size = 65535;
@@ -111,16 +113,13 @@ namespace nr {
     uint16_t pe = 0;
     bool have_priority = false;
 
-    if (config.rnti_tracker.enabled &&
-        (config.rnti_tracker.priority_start != 0 || config.rnti_tracker.priority_end != 0)) {
-      ps = config.rnti_tracker.priority_start;
-      pe = config.rnti_tracker.priority_end;
+    ps = priority_start;
+    pe = priority_end;
 
-      // MHZ - Check bounds wrt configured RNTI range
-      if (ps < rnti_start) ps = rnti_start;
-      if (pe > rnti_end) pe = rnti_end;
-      have_priority = (ps != 0 || pe != 0) && (ps <= pe);
-    }
+    // MHZ - Check bounds wrt configured RNTI range
+    if (ps < rnti_start) ps = rnti_start;
+    if (pe > rnti_end) pe = rnti_end;
+    have_priority = (ps != 0 || pe != 0) && (ps <= pe);
 
     // MHZ - First, add the priority range
     if (have_priority) {

@@ -19,6 +19,8 @@ typedef struct pdcch_config {
   bool extended_prefix;
   uint16_t rnti_start;
   uint16_t rnti_end;
+  uint16_t priority_start;
+  uint16_t priority_end;
   uint16_t max_rnti_queue_size;
   uint16_t scrambling_id_start;
   uint16_t scrambling_id_end;
@@ -46,8 +48,6 @@ typedef struct rnti_tracker_config {
   double ttl_seconds;
   double beta;
   int emit_period_ms;
-  uint16_t priority_start;
-  uint16_t priority_end;
 } rnti_tracker_config;
 
 struct config {
@@ -98,13 +98,6 @@ struct config {
       tracker_cfg.beta = tracker_table["beta"].value_or(1.0);
       tracker_cfg.emit_period_ms = tracker_table["emit_period_ms"].value_or(0);
 
-      tracker_cfg.priority_start = tracker_table["priority_start"].value_or(0);
-      tracker_cfg.priority_end = tracker_table["priority_end"].value_or(0);
-      if (tracker_cfg.priority_start != 0 && tracker_cfg.priority_end != 0 &&
-          tracker_cfg.priority_end < tracker_cfg.priority_start) {
-            std::swap(tracker_cfg.priority_start, tracker_cfg.priority_end);
-      }
-
       conf.rnti_tracker = tracker_cfg;
     } else {
       SPDLOG_INFO("Tracker table not found in TOML config");
@@ -131,6 +124,11 @@ struct config {
         pdcch_cfg.rnti_end = pdcch_table["rnti_end"].value_or(0xffff);
         pdcch_cfg.scrambling_id_start = pdcch_table["scrambling_id_start"].value_or(0);
         pdcch_cfg.scrambling_id_end = pdcch_table["scrambling_id_end"].value_or(0xffff);
+
+        // MHZ - Read priority range from the PDCCH config
+        pdcch_cfg.priority_start = pdcch_table["priority_start"].value_or(0);
+        pdcch_cfg.priority_end = pdcch_table["priority_end"].value_or(0);
+
         pdcch_cfg.max_rnti_queue_size = pdcch_table["max_rnti_queue_size"].value_or(0xffff);
         pdcch_cfg.sample_rate_time = conf.sample_rate;
         pdcch_cfg.rnti_list_length = pdcch_table["rnti_list_length"].value_or(0xffff);
@@ -178,6 +176,7 @@ struct config {
         pdcch_cfg.coreset_nshift = pdcch_table["coreset_nshift"].value_or(0);
         pdcch_cfg.coreset_reg_bundle_size = pdcch_table["coreset_reg_bundle_size"].value_or(6);
         pdcch_cfg.coreset_interleaver_size = pdcch_table["coreset_interleaver_size"].value_or(2);
+
         conf.pdcch_configs.push_back(pdcch_cfg);
       } else {
         SPDLOG_ERROR("Unexpected config file format");

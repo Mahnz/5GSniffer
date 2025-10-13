@@ -19,6 +19,8 @@ namespace nr {
       uint16_t scrambling_id_end;
       uint16_t rnti_start;
       uint16_t rnti_end;
+      uint16_t priority_start;
+      uint16_t priority_end;
       uint16_t max_rnti_queue_size;
       std::vector<uint8_t> dci_sizes_list; 
       std::vector<float> AL_corr_thresholds;  
@@ -37,6 +39,12 @@ namespace nr {
       coreset get_coreset_info();
       void set_RNTI(uint16_t RNTI_);
       void set_coreset_info(coreset coreset_info_);
+      
+      void set_priority_range(uint16_t start, uint16_t end) {
+        priority_start = start;
+        priority_end = end;
+      }
+      
       void initialize_RNTI_list();
       bool update_RNTI_list(uint16_t found_RNTI);
       void initialize_dmrs_seq(); 

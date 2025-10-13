@@ -23,6 +23,8 @@ channel_mapper::channel_mapper(shared_ptr<nr::phy> phy, pdcch_config pdcch_confi
   pdcch.scrambling_id_end = pdcch_config.scrambling_id_end;
   pdcch.rnti_start = pdcch_config.rnti_start;
   pdcch.rnti_end = pdcch_config.rnti_end;
+  pdcch.priority_start = pdcch_config.priority_start;
+  pdcch.priority_end = pdcch_config.priority_end;
   pdcch.dci_sizes_list = pdcch_config.dci_sizes_list;
   pdcch.AL_corr_thresholds = pdcch_config.AL_corr_thresholds;
   pdcch.max_rnti_queue_size = pdcch_config.max_rnti_queue_size;

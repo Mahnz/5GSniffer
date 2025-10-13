@@ -51,7 +51,7 @@ static inline std::string json_escape(const std::string &s) {
 
 // ——————————————————————————————————————————————————————————————
 
-JsonPerRntiSink::JsonPerRntiSink(const std::string &path) : path_(path) {}
+JsonPerRntiSink::JsonPerRntiSink(const std::string &path) : path_(path + ".json") {}
 
 void JsonPerRntiSink::on_event(const std::string &/*event_type*/, const RntiRecord &r) {
   records_[r.rnti] = r; // Updated record of events per RNTI
