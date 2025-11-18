@@ -2,14 +2,17 @@
 file_path = ""
 sample_rate = 23040000
 frequency = 3996480000
-nid_1 = 1
-ssb_numerology = 0
+nid_1 = 0    # PCI = 3*NID1 + NID2 = 0  ->  NID1 = 0, NID2 = 0
+nid_2 = 0
+ssb_numerology = 1  # dl_subcarrierSpacing=1 -> SSB subcarrier spacing = 30kHz;
 rf_args = "type=b200,master_clock_rate=23.04e6"
+zmq_ip = "127.0.0.1"
+zmq_port = "23501"
 
 
 [rnti_tracker]
 enabled = true
-output_path = "./logs/rnti_log_1"
+output_path = "/5gsniffer/logs/rnti_log_1"
 format = "json,csv"
 # beta = 1.25                                   # people-per-device correction factor (check with papers found)
 ttl_seconds = 10.0                            # RNTI inactivity expiry (between 10 and 30 seconds)
@@ -18,37 +21,41 @@ emit_period_ms = 1000                         # emit output every N ms (0 to dis
 
 # [[pdcch]]
 # # si_dci_only = true
-# use_config_from_mib = true
-# dci_sizes_list = [39]
-# scrambling_id_start = 1
-# scrambling_id_end = 10
-# # priority_start = 15000
-# # priority_end = 25000
-# rnti_start = 0
-# rnti_end = 65535
-# coreset_interleaving_pattern = "non-interleaved"
-# coreset_duration = 2
+use_config_from_mib = true
+dci_sizes_list = [39, 41, 42]
+scrambling_id_start = 0
+scrambling_id_end = 65535
+rnti_start = 0   # 17921
+rnti_end = 65535   # 17922
+# priority_start = 15000
+# priority_end = 25000
+coreset_interleaving_pattern = "interleaved"
+coreset_duration = 2
+AL_corr_thresholds = [1, 1, 0.5, 1, 1]
+num_candidates_per_AL = [0, 0, 4, 0, 0]
 # AL_corr_thresholds = [0.5, 0.5, 0.5, 0.5, 1]
 # num_candidates_per_AL = [8, 4, 4, 1, 0]
 
 
 [[pdcch]]
-coreset_id = 12
+coreset_id = 0
 # sc offset aligns the BWP to the lowest SC of the BWP
 # As there is an offset of 150 KHz between SSB (to the fc we synch) and the DL_ARCFN,
 # the CBW is 52 RBs, and our CORESET is 48 RBs, we shift by 150KHz/15KHz + (52-48)*12(sc/RB)/2
-# divided by 2 because we are centered around SSB.
-subcarrier_offset = 30
+# divided by 2 because we are centered around SSB. 
+subcarrier_offset = 66
 num_prbs = 51
 numerology = 0
-dci_sizes_list = [39]
+dci_sizes_list = [39, 41, 42]
 scrambling_id_start = 0
 scrambling_id_end = 65535
 rnti_start = 0   # 17921
 rnti_end = 65535   # 17922
-priority_start = 15000
-priority_end = 25000
-coreset_interleaving_pattern = "non-interleaved"
+# priority_start = 15000
+# priority_end = 25000
+coreset_interleaving_pattern = "interleaved"
 coreset_duration = 2
 AL_corr_thresholds = [1, 1, 0.5, 1, 1]
 num_candidates_per_AL = [0, 0, 4, 0, 0]
+# AL_corr_thresholds = [0.5, 0.5, 0.5, 0.5, 1]
+# num_candidates_per_AL = [8, 4, 4, 1, 0]

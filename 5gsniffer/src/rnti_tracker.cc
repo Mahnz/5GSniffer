@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <cctype>
 #include <algorithm>
+#include <cstring>
 
 
 // —————————————————————————— Helpers ——————————————————————————
@@ -132,9 +133,172 @@ void JsonPerRntiSink::write_all() {
 }
 
 
+// —————————————————————————— CsvPerEventSink ——————————————————————————
+CsvPerEventSink::CsvPerEventSink(const std::string &path) : path_(path + ".csv") {}
+
+void CsvPerEventSink::ensure_csv_header() {
+  std::error_code ec;
+  bool need_header = false;
+  if (!std::filesystem::exists(path_, ec)) {
+    need_header = true;
+  } else {
+    auto sz = std::filesystem::file_size(path_, ec);
+    need_header = ec || sz == 0;
+  }
+  if (need_header) {
+    std::ofstream f(path_, std::ios::app);
+    f << "t_seconds,rnti,cell_id,scrambling_id,coreset_id,aggregation_level,candidate_idx,slot,ofdm_symbol,correlation,sample_index,seen_count,revivals\n";
+  }
+}
+
+void CsvPerEventSink::append_csv_event(const RntiEvent& ev, const RntiRecord& r) {
+  std::ofstream f(path_, std::ios::app);
+  f << std::fixed << std::setprecision(6) << ev.t_seconds << ","
+    << ev.rnti << ","
+    << ev.cell_id << ","
+    << ev.scrambling_id << ","
+    << static_cast<int>(ev.coreset_id) << ","
+    << static_cast<int>(ev.aggregation_level) << ","
+    << static_cast<int>(ev.candidate_idx) << ","
+    << static_cast<int>(ev.slot) << ","
+    << static_cast<int>(ev.ofdm_symbol) << ","
+    << ev.correlation << ","
+    << ev.sample_index << ","
+    << r.seen_count << ","
+    << r.revivals
+    << "\n";
+}
+
+void CsvPerEventSink::on_event(const std::string &/*event_type*/, const RntiRecord &r) {
+  if (r.events.empty()) return;
+  ensure_csv_header();
+  const RntiEvent& ev = r.events.back();
+  append_csv_event(ev, r);
+}
+
+// ————————————————————————— CompositeRntiSink —————————————————————————
+void CompositeRntiSink::on_event(const std::string &event_type, const RntiRecord &rec) {
+  for (auto& s : sinks_) s->on_event(event_type, rec);
+}
+
+void CompositeRntiSink::flush() {
+  for (auto& s : sinks_) s->flush();
+}
+
+void CompositeRntiSink::set_config(const std::string& format, double ttl_seconds) {
+  for (auto& s : sinks_) {
+    if (auto* js = dynamic_cast<JsonPerRntiSink*>(s.get())) {
+      js->set_config(format, ttl_seconds);
+    } else if (auto* cs = dynamic_cast<CompositeRntiSink*>(s.get())) {
+      cs->set_config(format, ttl_seconds);
+    }
+  }
+}
+
+
+// ————————————————————————— ZmqRntiSink —————————————————————————
+
+ZmqSink::ZmqSink(const std::string &endpoint, bool bind) : endpoint_(endpoint), bind_(bind) {
+  ctx_ = zmq_ctx_new();
+  sock_ = zmq_socket(ctx_, ZMQ_PUB);
+
+  int hwm = 100000;
+  zmq_setsockopt(sock_, ZMQ_SNDHWM, &hwm, sizeof(hwm));
+
+  int immediate = 1;
+  zmq_setsockopt(sock_, ZMQ_IMMEDIATE, &immediate, sizeof(immediate));
+
+  if (bind_) {
+    if (zmq_bind(sock_, endpoint_.c_str()) != 0) {
+      std::fprintf(stderr, "[ZmqSink] zmq_bind failed: %s\n", zmq_strerror(zmq_errno()));
+    }
+  } else {
+    if (zmq_connect(sock_, endpoint_.c_str()) != 0) {
+      std::fprintf(stderr, "[ZmqSink] zmq_connect failed: %s\n", zmq_strerror(zmq_errno()));
+    }
+  }
+}
+
+ZmqSink::~ZmqSink() {
+  if (sock_) zmq_close(sock_);
+  if (ctx_) zmq_ctx_term(ctx_);
+}
+
+void ZmqSink::on_event(const std::string &event_type, const RntiRecord &r) {
+  if (!sock_) return;
+  if (r.events.empty()) return;  // nessun evento da pubblicare
+
+  const RntiEvent& ev = r.events.back();
+
+  char buf[4096];
+  std::snprintf(buf, sizeof(buf),
+    "{"
+      "\"type\":\"rnti_event\","
+      "\"event\":\"%s\","
+      "\"rnti\":%u,"
+      "\"cell_id\":%u,"
+      "\"scrambling_id\":%u,"
+      "\"coreset_id\":%u,"
+      "\"t_seconds\":%.6f,"
+      "\"sample_index\":%lld,"
+      "\"seen_count\":%u,"
+      "\"revivals\":%u,"
+      "\"aggregation_level\":%u,"
+      "\"candidate_idx\":%u,"
+      "\"slot\":%u,"
+      "\"ofdm_symbol\":%u,"
+      "\"correlation\":%.6f,"
+      "\"status\":\"active\""
+    "}",
+    event_type.c_str(),
+    static_cast<unsigned>(r.rnti),
+    static_cast<unsigned>(ev.cell_id),
+    static_cast<unsigned>(ev.scrambling_id),
+    static_cast<unsigned>(ev.coreset_id),
+    ev.t_seconds,
+    static_cast<long long>(ev.sample_index),
+    static_cast<unsigned>(r.seen_count),
+    static_cast<unsigned>(r.revivals),
+    static_cast<unsigned>(ev.aggregation_level),
+    static_cast<unsigned>(ev.candidate_idx),
+    static_cast<unsigned>(ev.slot),
+    static_cast<unsigned>(ev.ofdm_symbol),
+    static_cast<double>(ev.correlation)
+  );
+
+  zmq_send(sock_, buf, std::strlen(buf), ZMQ_DONTWAIT);
+}
+
+
+
 // ——————————————————— Tracker Initialization ———————————————————
+
 std::unique_ptr<IRntiSink> RntiTracker::make_sink(const std::string &format, const std::string &path) {
-  return std::make_unique<JsonPerRntiSink>(path);
+  const std::string f = format;
+  const bool want_json = (f.find("json") != std::string::npos) || f.empty();
+  const bool want_csv  = (f.find("csv") != std::string::npos);
+  const bool want_zmq  = (f.find("zmq") != std::string::npos);
+
+  if (want_json && want_csv && want_zmq) {
+    auto composite = std::make_unique<CompositeRntiSink>();
+    composite->add_sink(std::make_unique<JsonPerRntiSink>(path));
+    composite->add_sink(std::make_unique<CsvPerEventSink>(path));
+    composite->add_sink(std::make_unique<ZmqSink>("tcp://*:5557", true));
+    return composite;
+  }
+  if (want_json && want_csv) {
+    auto composite = std::make_unique<CompositeRntiSink>();
+    composite->add_sink(std::make_unique<JsonPerRntiSink>(path));
+    composite->add_sink(std::make_unique<CsvPerEventSink>(path));
+    return composite;
+  } else if (want_json) {
+    return std::make_unique<JsonPerRntiSink>(path);
+  } else if (want_csv) {
+    return std::make_unique<CsvPerEventSink>(path);
+  }
+  if (want_zmq) {
+    return std::make_unique<ZmqSink>("tcp://*:5557", true);
+  }
 }
 
 RntiTracker &RntiTracker::instance() {
@@ -151,6 +315,8 @@ void RntiTracker::configure(const std::string &output_path,
 
   if (auto *s = dynamic_cast<JsonPerRntiSink*>(sink_.get())) {
     s->set_config(format, ttl_seconds_);
+  } else if (auto *m = dynamic_cast<CompositeRntiSink*>(sink_.get())) {
+    m->set_config(format, ttl_seconds_);
   }
 }
 
@@ -173,7 +339,7 @@ void RntiTracker::observe(const RntiEvent &ev) {
     r.events.push_back(ev);
     it = table_.emplace(ev.rnti, std::move(r)).first;
 
-    // O(1): nuovo RNTI inserito -> incrementa contatore attivi
+    // O(1): new RNTI inserted -> increment active counter
     active_count_++;
 
   } else {
@@ -182,7 +348,6 @@ void RntiTracker::observe(const RntiEvent &ev) {
     const double gap = ev.t_seconds - r.last_seen;
     if (gap > ttl_seconds_) {
       r.revivals++;
-      // r.last_inactive_gap_s = gap;
     }
     
     r.last_seen = ev.t_seconds;
@@ -213,16 +378,7 @@ void RntiTracker::expire_older_than(double cutoff_s) {
   }
 }
 
-// TODO - Evaluate which alternative is better
-// size_t RntiTracker::active_count(double now_s) const {
-//   std::lock_guard<std::mutex> lk(mu_);
-//   size_t n = 0;
-//   for (const auto &kv : table_) {
-//     if (now_s - kv.second.last_seen <= ttl_seconds_)
-//       n++;
-//   }
-//   return n;
-// }
+// To keep a counter of active RNTIs in O(1)
 size_t RntiTracker::active_count(double /*now_s*/) const {
   std::lock_guard<std::mutex> lk(mu_);  // thread-safe, to keep data consistency
   return active_count_;

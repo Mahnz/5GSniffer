@@ -9,6 +9,8 @@
 #include <optional>
 #include <vector>
 
+#include <zmq.h>
+
 struct RntiEvent {
   uint16_t rnti = 0;
   uint16_t cell_id = 0;
@@ -43,6 +45,8 @@ public:
   virtual void flush() {}
 };
 
+// ——————————————————————————————————————————————————————————————
+
 class JsonPerRntiSink : public IRntiSink {
 public:
   explicit JsonPerRntiSink(const std::string &path);
@@ -62,6 +66,52 @@ private:
   std::string format_;
   double ttl_seconds_ = 0.0;
   std::unordered_map<uint16_t, RntiRecord> records_;
+};
+
+// ——————————————————————————————————————————————————————————————
+
+class CsvPerEventSink : public IRntiSink {
+public:
+  explicit CsvPerEventSink(const std::string &path);
+  void on_event(const std::string &event_type, const RntiRecord &rec) override;
+  void flush() override {}
+
+private:
+  void ensure_csv_header();
+  void append_csv_event(const RntiEvent& ev, const RntiRecord& rec);
+  std::string path_;
+};
+
+class CompositeRntiSink : public IRntiSink {
+public:
+  void add_sink(std::unique_ptr<IRntiSink> s) { sinks_.emplace_back(std::move(s)); }
+  void on_event(const std::string &event_type, const RntiRecord &rec) override;
+  void flush() override;
+  void set_config(const std::string& format, double ttl_seconds);
+
+private:
+  std::vector<std::unique_ptr<IRntiSink>> sinks_;
+};
+
+// ——————————————————————————————————————————————————————————————
+
+class ZmqSink : public IRntiSink {
+public:
+  // endpoint examples: "tcp://*:5557" to bind, or "tcp://broker:5557" to connect
+  explicit ZmqSink(const std::string &endpoint, bool bind);
+  ~ZmqSink() override;
+
+  void on_event(const std::string &event_type, const RntiRecord &rec) override;
+  void flush() override {}
+
+  // optional: allow runtime changes (no-op here)
+  void set_config(const std::string&, double) {}
+
+private:
+  void *ctx_ = nullptr;
+  void *sock_ = nullptr;
+  std::string endpoint_;
+  bool bind_ = true;
 };
 
 // ——————————————————————————————————————————————————————————————

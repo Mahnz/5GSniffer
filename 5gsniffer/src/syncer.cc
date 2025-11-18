@@ -29,9 +29,11 @@ using namespace std;
 /** 
  * Constructor for syncer.
  */
-syncer::syncer(uint64_t sample_rate, shared_ptr<nr::phy> phy) :
+// MHZ - Pass zmq_address
+syncer::syncer(uint64_t sample_rate, shared_ptr<nr::phy> phy, const std::string& zmq_address) :
   sample_rate(sample_rate),
-  phy(phy) {
+  phy(phy),
+  zmq_address(zmq_address) {
   // Reserve some space for the processing queue
   processing_queue.reserve(1024*1024);
 
@@ -74,7 +76,8 @@ syncer::syncer(uint64_t sample_rate, shared_ptr<nr::phy> phy) :
   pss_window_size = std::floor((float)sample_rate /(float)(phy->ssb_bwp->scs) * 8);
  
   // Create pool of 64 flows that can process samples in parallel after synchronization
-  flow_pool = make_shared<nr::flow_pool>(64);
+  // MHZ - Pass zmq_address
+  flow_pool = make_shared<nr::flow_pool>(64, this->zmq_address);
   this->connect(flow_pool);
 }
 

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 PROCS=$(nproc)
+CONTAINER_NAME="5gsniffer-cnt"
 
-# Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
   --build)
@@ -25,13 +25,22 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ "$BUILD" == "true" ]; then
-  docker build --build-arg PROC=$PROCS -t 5gsniffer:latest .
-elif [ "$RUN" == "true" ]; then
-  docker run --rm --name="5gsniffer-cnt" \
-    -v "/home/mahnz/Desktop/5G_Thesis/samples:/5gsniffer/test/samples:z" \
-    -v "/home/mahnz/Desktop/5G_Thesis/5GSniffer/5gsniffer/configs:/5gsniffer/configs:z" \
-    -it 5gsniffer:latest
-else
+  PROC=$PROCS docker compose build
+fi
+
+if [ "$RUN" == "true" ]; then
+  PROC=$PROCS docker compose up -d --build
+
+  echo ""
+  echo "[INFO] Containers started. Attaching interactive shell to sniffer (Ctrl+D or exit to detach)."
+  docker compose exec sniffer /bin/bash
+
+  echo ""
+  echo "[INFO] Stopping compose services..."
+  docker compose down --remove-orphans
+fi
+
+if [ "$BUILD" != "true" ] && [ "$RUN" != "true" ]; then
   echo "Usage: $0 [--build|--run] [--procs NUMBER]"
   echo "  --build: Build the Docker image"
   echo "  --run:   Run the Docker container"

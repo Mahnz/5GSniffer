@@ -12,8 +12,9 @@ using namespace std;
  */
 class sniffer {
   public:
-    sniffer(uint64_t sample_rate, uint64_t frequency, string rf_args, uint16_t ssb_numerology); ///< Create a sniffer for an SDR source.
-    sniffer(uint64_t sample_rate, string path, uint16_t ssb_numerology); ////< Create a sniffer for a file source.
+    // MHZ - Pass zmq_address
+    sniffer(uint64_t sample_rate, uint64_t frequency, string rf_args, uint16_t ssb_numerology, const std::string& zmq_address); ///< Create a sniffer for an SDR source.
+    sniffer(uint64_t sample_rate, string path, uint16_t ssb_numerology, const std::string& zmq_address); ///< Create a sniffer for a file source.
     virtual ~sniffer();
     void start();
     void stop();
@@ -24,6 +25,8 @@ class sniffer {
   private:
     void init();
     bool running;
+    
+    std::string zmq_address_;
 };
 
 #endif // SNIFFER_H

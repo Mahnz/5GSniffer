@@ -57,6 +57,7 @@ struct config {
   uint8_t nid_2;
   string rf_args;
   uint16_t ssb_numerology;
+  string zmq_address;
 
   vector<pdcch_config> pdcch_configs;
 
@@ -76,6 +77,10 @@ struct config {
     conf.nid_2 = toml["sniffer"]["nid_2"].value_or(4);
     conf.rf_args = toml["sniffer"]["rf_args"].value_or(""sv).data();
     conf.ssb_numerology = toml["sniffer"]["ssb_numerology"].value_or(0);
+
+    string zmq_ip = toml["sniffer"]["zmq_ip"].value_or("127.0.0.1"sv).data();
+    string zmq_port = toml["sniffer"]["zmq_port"].value_or("23501"sv).data();
+    conf.zmq_address = "tcp://" + zmq_ip + ":" + zmq_port;
 
     // MHZ - RNTI tracker config
     if (toml.contains("rnti_tracker") && toml["rnti_tracker"].is_table()) {

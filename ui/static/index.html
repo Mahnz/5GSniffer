@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>rt-rnti-viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 1rem; background: #0b0b0b; color: #eaeaea; }
+    h1 { font-size: 1.2rem; margin: 0 0 0.5rem 0; }
+    .stats { display: flex; gap: 1rem; margin-bottom: 1rem; }
+    .card { background: #151515; padding: 1rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+    th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #2b2b2b; }
+    th { position: sticky; top: 0; background: #111; }
+    .badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 6px; background: #2b2b2b; font-size: 0.8rem; }
+    .good { color: #74d680; }
+    .warn { color: #f1c40f; }
+    .bad { color: #ff6b6b; }
+    .row-fade { animation: fadeIn 0.4s ease-in; }
+    @keyframes fadeIn { from { background: #1f1f1f; } to { background: transparent; } }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    @media (min-width: 900px) { .grid { grid-template-columns: 2fr 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>Real-time RNTIs</h1>
+  <div class="stats grid">
+    <div class="card">
+      <div id="summary">Loading…</div>
+      <table id="rnti-table">
+        <thead>
+          <tr>
+            <th>RNTI</th>
+            <th>Cell</th>
+            <th>Seen</th>
+            <th>Revivals</th>
+            <th>Last Seen (s)</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div><b>Recently expired</b></div>
+      <ul id="expired-list"></ul>
+    </div>
+  </div>
+
+<script>
+const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+let active = {};
+const ttl = 30; // for local UI estimation only
+
+function fmt(n) { return new Intl.NumberFormat().format(n); }
+function now() { return Date.now()/1000; }
+
+function renderSummary(stats) {
+  const el = document.getElementById("summary");
+  el.innerHTML = `<b>Active:</b> ${fmt(stats.active_count)} &nbsp; <b>Total seen:</b> ${fmt(stats.total_seen)}`;
+}
+
+function renderActive() {
+  const tbody = document.querySelector("#rnti-table tbody");
+  tbody.innerHTML = "";
+  const rows = Object.values(active).sort((a,b)=>b.last_seen - a.last_seen).slice(0,500);
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.className = "row-fade";
+    tr.innerHTML = `
+      <td><code>${r.rnti}</code></td>
+      <td>${r.cell_id ?? ""}</td>
+      <td>${r.seen_count}</td>
+      <td>${r.revivals}</td>
+      <td>${(now()-r.last_seen).toFixed(2)}</td>
+      <td><span class="badge ${"good"}">active</span></td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function appendExpired(item) {
+  const ul = document.getElementById("expired-list");
+  const li = document.createElement("li");
+  const ago = (now() - item.expired_at).toFixed(1);
+  li.textContent = `rnti=${item.rnti} cell=${item.cell_id ?? ""} expired ${ago}s ago`;
+  ul.prepend(li);
+  while (ul.childElementCount > 50) ul.removeChild(ul.lastChild);
+}
+
+async function prime() {
+  const res = await fetch("/snapshot");
+  const data = await res.json();
+  renderSummary(data.stats);
+  active = {};
+  for (const s of data.active) active[s.rnti] = s;
+  renderActive();
+  for (const e of data.recently_expired) appendExpired(e);
+}
+
+ws.onmessage = (ev) => {
+  const msg = JSON.parse(ev.data);
+  if (msg.type === "batch") {
+    for (const it of msg.items) {
+      const s = it.snapshot;
+      if (it.event === "expire") {
+        delete active[s.rnti];
+        appendExpired({rnti: s.rnti, cell_id: s.cell_id, expired_at: s.last_seen});
+      } else {
+        active[s.rnti] = s;
+      }
+    }
+    renderActive();
+  }
+};
+
+ws.onopen = prime;
+setInterval(async () => {
+  // Periodically refresh stats
+  const res = await fetch("/snapshot");
+  const data = await res.json();
+  renderSummary(data.stats);
+}, 3000);
+</script>
+</body>
+</html>
+

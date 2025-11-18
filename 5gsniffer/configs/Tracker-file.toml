@@ -1,20 +1,20 @@
 [sniffer]
-# file_path = ""
 file_path = "../test/samples/srsRAN_octoclock_samprate_2304_10MHz_scscommon_15khz_b200_fdd_n71_pci_1_2phones_onevoicecall_oneyoutube_rntis_4601_4602_5seconds.fc32"
 sample_rate = 23040000
 frequency = 627750000
 nid_1 = 1
 ssb_numerology = 0
 rf_args = "type=b200,master_clock_rate=23.04e6"
+zmq_ip = "127.0.0.1"
+zmq_port = "23501"
 
 
 [rnti_tracker]
 enabled = true
-output_path = "./logs/rnti_log"
-format = "json,csv"
-# beta = 1.25                                  # people-per-device correction factor (check with papers found)
+output_path = "/5gsniffer/logs/rnti_log_1"
+format = "json,csv,zmq"                      # output format
 ttl_seconds = 10.0                           # RNTI inactivity expiry (between 10 and 30 seconds)
-emit_period_ms = 1000                        # emit output every N ms (0 to disable)
+emit_period_ms = 500                         # emit output every N ms (0 to disable)
 
 
 [[pdcch]]
@@ -29,10 +29,10 @@ numerology = 0
 dci_sizes_list = [39]
 scrambling_id_start = 1
 scrambling_id_end = 10
-rnti_start = 0   # 17921
-rnti_end = 65535   # 17922
-priority_start = 15000
-priority_end = 25000
+rnti_start = 0
+rnti_end = 65535
+priority_start = 17000
+priority_end = 18000
 coreset_interleaving_pattern = "non-interleaved"
 coreset_duration = 2
 AL_corr_thresholds = [1, 1, 0.5, 1, 1]

@@ -53,12 +53,12 @@ int main(int argc, char** argv) {
 
     // Create sniffer
     if(config.file_path.compare("") == 0) {
-      // MHZ - Using SDR, real-time detection
-      sniffer sniffer(config.sample_rate, config.frequency, config.rf_args, config.ssb_numerology);
+      // MHZ - Pass zmq_address. Using SDR, real-time detection
+      sniffer sniffer(config.sample_rate, config.frequency, config.rf_args, config.ssb_numerology, config.zmq_address);
       sniffer.start();
     } else {
-      // MHZ - Using file, offline detection
-      sniffer sniffer(config.sample_rate, config.file_path.data(), config.ssb_numerology);
+      // MHZ - Pass zmq_address. Using file, offline detection
+      sniffer sniffer(config.sample_rate, config.file_path.data(), config.ssb_numerology, config.zmq_address);
       sniffer.start();
     }
   } catch (sniffer_exception& e) {

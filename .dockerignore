@@ -1,3 +1,6 @@
 5gsniffer/test/samples
 5gsniffer/build
 5gsniffer/configs
+**/__pycache__
+**/.venv
+**/.vscode

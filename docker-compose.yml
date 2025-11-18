@@ -1,0 +1,49 @@
+services:
+  sniffer:
+    build:
+      context: ./5gsniffer
+      dockerfile: Dockerfile
+      args:
+        PROC: ${PROC:-}
+    container_name: 5gsniffer-cnt
+    privileged: true # to make UHD devices work
+    stdin_open: true
+    tty: true
+    volumes:
+      - type: bind
+        source: ../samples
+        target: /5gsniffer/test/samples
+      - type: bind
+        source: ./5gsniffer/configs
+        target: /5gsniffer/configs
+    entrypoint: ["/bin/bash"]
+    expose:
+      - "5557"
+    networks:
+      ranmesh:
+        aliases:
+          - sniffer
+
+  ui:
+    build:
+      context: ./ui/good
+      dockerfile: Dockerfile
+    image: rnti-viewer:latest
+    container_name: rnti-viewer
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    depends_on:
+      - sniffer
+    environment:
+      - ZMQ_ENDPOINT=tcp://sniffer:5557
+      - RNTI_TTL_SECONDS=${RNTI_TTL_SECONDS:-30}
+      - WS_BROADCAST_INTERVAL_MS=${WS_BROADCAST_INTERVAL_MS:-500}
+      - HOST=0.0.0.0
+      - PORT=8088
+    networks:
+      ranmesh: {}
+
+networks:
+  ranmesh:
+    driver: bridge

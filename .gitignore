@@ -1,7 +1,9 @@
 **/.vscode
+**/.venv
 **/build
 **/build_docker
 **/logs
 **/*.p
 **/*.fc32
+**/__pycache__
 5gsniffer/lib/srsRANRF
